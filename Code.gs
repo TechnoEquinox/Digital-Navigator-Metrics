@@ -1,15 +1,3 @@
-// Created by Connor Bailey
-// Wallingford Public Library: Tech Connect Program
-// Version 1.1
-//
-// About:
-// This script analyzes the Appointment Summary (Responses) sheet to provide metrics for
-// Tech Connect employees. This script currently calculates the total appointments seen
-// by the entire department for the month, quarter, and year. Additionally, this script
-// calculates an individual employees total appointments for the month, quarter, and year.
-// All of these statistics are then feed into a horizontal bar graph that visualizes the
-// appointments over the year.
-
 // Counts the total appointments for the current month
 function getMonthlyAppointments() {
   return countAppointments(new Date().getFullYear(), new Date().getMonth());
@@ -42,11 +30,17 @@ function countAppointments(year, monthOrMonths) {
 }
 
 // Checks if a date falls within the specified year and month(s)
+// Adjusted to handle yearly counting when monthOrMonths is not provided
 function isWithinPeriod(date, year, monthOrMonths) {
-  return date.getFullYear() === year && 
-         (Array.isArray(monthOrMonths) 
-           ? monthOrMonths.includes(date.getMonth()) 
-           : date.getMonth() === monthOrMonths);
+  if (date.getFullYear() !== year) return false;
+  
+  // If monthOrMonths is undefined, count the entire year
+  if (monthOrMonths === undefined) return true;
+  
+  // Handle both single month and array of months (e.g., quarter)
+  return Array.isArray(monthOrMonths)
+    ? monthOrMonths.includes(date.getMonth())
+    : date.getMonth() === monthOrMonths;
 }
 
 // Returns an array of counts of appointments by month for the current year
@@ -102,12 +96,51 @@ function getQuarterMonths() {
 
 // Validates if a given date object is valid
 function isValidDate(date) {
-  return date.toString() !== "Invalid Date";
+  return date.toString() !== "Invalid Date" && !isNaN(date.getTime());
 }
 
 // Gets the current month name
 function getCurrentMonthName() {
   return ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][new Date().getMonth()];
+}
+
+// Helper function to calculate average appointment times for a given period
+function getAverageAppointmentTime(year, monthOrMonths) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1");
+  var values = sheet.getDataRange().getValues();
+  var totalMinutes = 0;
+  var count = 0;
+
+  values.slice(1).forEach(row => { // Skip header row
+    var appointmentDate = new Date(row[0]);
+    var appointmentTime = row[5];
+    if (isValidDate(appointmentDate) && isWithinPeriod(appointmentDate, year, monthOrMonths) && appointmentTime > 0) {
+      totalMinutes += parseInt(appointmentTime);
+      count++;
+    }
+  });
+
+  return count > 0 ? totalMinutes / count : 0;
+}
+
+// Helper function to calculate average appointment times for an employee for a given period
+function getEmployeeAverageAppointmentTime(employeeName, period) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1");
+  var values = sheet.getDataRange().getValues();
+  var totalMinutes = 0;
+  var count = 0;
+
+  values.slice(1).forEach(row => {
+    var appointmentDate = new Date(row[0]);
+    var navigatorName = row[1];
+    var appointmentTime = row[5]; 
+    if (isValidDate(appointmentDate) && navigatorName.includes(employeeName) && isWithinPeriod(appointmentDate, period.year, period.monthOrMonths) && appointmentTime > 0) {
+      totalMinutes += parseInt(appointmentTime);
+      count++;
+    }
+  });
+
+  return count > 0 ? totalMinutes / count : 0;
 }
 
 function doGet() {
@@ -121,17 +154,22 @@ function doGet() {
   var quarterlyCount = getQuarterlyAppointments();
   var yearlyCount = getYearlyAppointments();
   var appointmentsByMonth = getAppointmentsByMonth();
+  var averageMonthlyTime = getAverageAppointmentTime(currentYear, new Date().getMonth());
+  var averageQuarterlyTime = getAverageAppointmentTime(currentYear, currentQuarter);
+  var averageYearlyTime = getAverageAppointmentTime(currentYear);
 
   // Employee stats
-  // NOTE: Input Employee names here
-  var employees = ["Employee 1", "Employee 2", "Employee 3"];
+  var employees = ["Connor Bailey", "Elijah Mitchell", "Employee 3"];
   
   var employeeStats = employees.map(employeeName => ({
     name: employeeName,
     monthlyCount: getEmployeeAppointments(employeeName, { year: currentYear, monthOrMonths: new Date().getMonth() }),
     quarterlyCount: getEmployeeAppointments(employeeName, { year: currentYear, monthOrMonths: currentQuarter }),
     yearlyCount: getEmployeeAppointments(employeeName, { year: currentYear }),
-    appointmentsByMonth: getAppointmentsByMonthForEmployee(employeeName)
+    appointmentsByMonth: getAppointmentsByMonthForEmployee(employeeName),
+    averageMonthlyTime: getEmployeeAverageAppointmentTime(employeeName, { year: currentYear, monthOrMonths: new Date().getMonth() }),
+    averageQuarterlyTime: getEmployeeAverageAppointmentTime(employeeName, { year: currentYear, monthOrMonths: currentQuarter }),
+    averageYearlyTime: getEmployeeAverageAppointmentTime(employeeName, { year: currentYear })
   }));
 
   // End measuring execution time
@@ -149,6 +187,9 @@ function doGet() {
   template.appointmentsByMonth = appointmentsByMonth;
   template.employeeStats = JSON.stringify(employeeStats);
   template.executionTime = executionTime.toFixed(3);
+  template.averageMonthlyTime = averageMonthlyTime;
+  template.averageQuarterlyTime = averageQuarterlyTime;
+  template.averageYearlyTime = averageYearlyTime;
 
   return template.evaluate().setTitle("Tech Connect Metrics (WIP)");
 }
