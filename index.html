@@ -11,14 +11,18 @@
       var currentMonthName = '<?= currentMonthName ?>';
       var currentQuarter = '<?= currentQuarter ?>';
       var currentYear = '<?= currentYear ?>';
+      var averageMonthlyTime = parseFloat('<?= averageMonthlyTime ?>');
+      var averageQuarterlyTime = parseFloat('<?= averageQuarterlyTime ?>');
+      var averageYearlyTime = parseFloat('<?= averageYearlyTime ?>');
 
-      // Draw the total chart for all appointments by month
       function drawAllCharts() {
         drawMainChart();
+        renderAppointmentPaceTable('summary-appointment-pace-table', averageMonthlyTime, averageQuarterlyTime, averageYearlyTime);
         renderEmployeeSections();
         drawAllEmployeeCharts();
       }
 
+      // Draw the total chart for all appointments by month
       function drawMainChart() {
         var data = google.visualization.arrayToDataTable([
           ['Month', 'Appointments'],
@@ -47,6 +51,39 @@
         chart.draw(data, options);
       }
 
+      // Render appointment pace table
+      function renderAppointmentPaceTable(containerId, monthlyTime, quarterlyTime, yearlyTime) {
+        var container = document.getElementById(containerId);
+        var tableHtml = `
+          <table style="width: 80%; margin: 10px auto; border-collapse: collapse; text-align: center; border: 1px solid black;">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Month</th>
+                <th>Quarter</th>
+                <th>Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding: 5px;">Appointment Pace (Minutes)</td>
+                <td style="color: ${getColorForPace(monthlyTime)}; border: 1px solid black; padding: 5px;">${monthlyTime.toFixed(0)}</td>
+                <td style="color: ${getColorForPace(quarterlyTime)}; border: 1px solid black; padding: 5px;">${quarterlyTime.toFixed(0)}</td>
+                <td style="color: ${getColorForPace(yearlyTime)}; border: 1px solid black; padding: 5px;">${yearlyTime.toFixed(0)}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+        container.innerHTML = tableHtml;
+      }
+
+      // Get color for appointment pace based on value
+      function getColorForPace(value) {
+        if (value <= 60) return 'green';
+        if (value < 75) return 'orange';
+        return 'red';
+      }
+
       // Render sections for each employee
       function renderEmployeeSections() {
         var container = document.getElementById('employee-sections');
@@ -56,9 +93,7 @@
         employeeStats.forEach(function(employee, index) {
           var employeeSection = document.createElement('div');
           employeeSection.innerHTML = `
-            <!-- Line break before each employee -->
             <hr style="width: 80%; margin: 50px auto; border: 1px solid #ccc;">
-            
             <div style="text-align: center; margin-top: 50px;">
               <h2 style="font-weight: bold; font-size: 28px;">${employee.name}</h2>
             </div>
@@ -77,11 +112,12 @@
               </div>
             </div>
             <div id="employee_chart_${index}" style="width: 900px; height: 400px; margin: 20px auto;"></div>
+            <div id="employee-appointment-pace-table-${index}"></div>
           `;
           container.appendChild(employeeSection);
+          renderAppointmentPaceTable(`employee-appointment-pace-table-${index}`, employee.averageMonthlyTime, employee.averageQuarterlyTime, employee.averageYearlyTime);
         });
       }
-
 
       // Draw the chart for each employee based on their appointment data
       function drawEmployeeChart(employeeIndex) {
@@ -147,7 +183,15 @@
     <!-- Div for the total appointments bar chart -->
     <div id="chart_div" style="width: 900px; height: 500px; margin: 0 auto; text-align: center;"></div>
 
+    <!-- Container for appointment pace table in the summary section -->
+    <div id="summary-appointment-pace-table"></div>
+
     <!-- Container for dynamically generated employee sections -->
     <div id="employee-sections"></div>
+
+    <!-- Display the execution time -->
+    <div style="text-align: center; font-size: 12px; color: #555; margin-top: 20px;">
+      Page generated in <?= executionTime ?> seconds.
+    </div>  
   </body>
 </html>
