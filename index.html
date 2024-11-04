@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawAllCharts);
+
+      // Convert the JSON string from the backend to a JavaScript object
+      var employeeStats = JSON.parse('<?= employeeStats ?>');
+      var currentMonthName = '<?= currentMonthName ?>';
+      var currentQuarter = '<?= currentQuarter ?>';
+      var currentYear = '<?= currentYear ?>';
+
+      // Draw the total chart for all appointments by month
+      function drawAllCharts() {
+        drawMainChart();
+        renderEmployeeSections();
+        drawAllEmployeeCharts();
+      }
+
+      function drawMainChart() {
+        var data = google.visualization.arrayToDataTable([
+          ['Month', 'Appointments'],
+          ['January', parseInt(<?= appointmentsByMonth[0] ?>)],
+          ['February', parseInt(<?= appointmentsByMonth[1] ?>)],
+          ['March', parseInt(<?= appointmentsByMonth[2] ?>)],
+          ['April', parseInt(<?= appointmentsByMonth[3] ?>)],
+          ['May', parseInt(<?= appointmentsByMonth[4] ?>)],
+          ['June', parseInt(<?= appointmentsByMonth[5] ?>)],
+          ['July', parseInt(<?= appointmentsByMonth[6] ?>)],
+          ['August', parseInt(<?= appointmentsByMonth[7] ?>)],
+          ['September', parseInt(<?= appointmentsByMonth[8] ?>)],
+          ['October', parseInt(<?= appointmentsByMonth[9] ?>)],
+          ['November', parseInt(<?= appointmentsByMonth[10] ?>)],
+          ['December', parseInt(<?= appointmentsByMonth[11] ?>)]
+        ]);
+
+        var options = {
+          title: 'Appointments by Month in ' + currentYear,
+          hAxis: {title: '# of Appointments'},
+          vAxis: {title: 'Month', minValue: 0},
+          chartArea: {width: '50%'}
+        };
+
+        var chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+      }
+
+      // Render sections for each employee
+      function renderEmployeeSections() {
+        var container = document.getElementById('employee-sections');
+        container.innerHTML = '';  // Clear any existing content
+
+        // Loop through employeeStats and dynamically create HTML elements for each employee
+        employeeStats.forEach(function(employee, index) {
+          var employeeSection = document.createElement('div');
+          employeeSection.innerHTML = `
+            <!-- Line break before each employee -->
+            <hr style="width: 80%; margin: 50px auto; border: 1px solid #ccc;">
+            
+            <div style="text-align: center; margin-top: 50px;">
+              <h2 style="font-weight: bold; font-size: 28px;">${employee.name}</h2>
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px;">
+              <div style="margin-right: 50px; text-align: center;">
+                <h2 style="font-weight: bold;">Completed Appointments (${currentMonthName})</h2>
+                <h1>${employee.monthlyCount}</h1>
+              </div>
+              <div style="margin-right: 50px; text-align: center;">
+                <h2 style="font-weight: bold;">Completed Appointments (${currentQuarter})</h2>
+                <h1>${employee.quarterlyCount}</h1>
+              </div>
+              <div style="text-align: center;">
+                <h2 style="font-weight: bold;">Completed Appointments (${currentYear})</h2>
+                <h1>${employee.yearlyCount}</h1>
+              </div>
+            </div>
+            <div id="employee_chart_${index}" style="width: 900px; height: 400px; margin: 20px auto;"></div>
+          `;
+          container.appendChild(employeeSection);
+        });
+      }
+
+
+      // Draw the chart for each employee based on their appointment data
+      function drawEmployeeChart(employeeIndex) {
+        var employee = employeeStats[employeeIndex];
+        if (!employee.appointmentsByMonth) {
+          console.log(`No data found for employee: ${employee.name}`);
+          return;
+        }
+
+        var employeeData = [
+          ['Month', 'Appointments'],
+          ['January', parseInt(employee.appointmentsByMonth[0])],
+          ['February', parseInt(employee.appointmentsByMonth[1])],
+          ['March', parseInt(employee.appointmentsByMonth[2])],
+          ['April', parseInt(employee.appointmentsByMonth[3])],
+          ['May', parseInt(employee.appointmentsByMonth[4])],
+          ['June', parseInt(employee.appointmentsByMonth[5])],
+          ['July', parseInt(employee.appointmentsByMonth[6])],
+          ['August', parseInt(employee.appointmentsByMonth[7])],
+          ['September', parseInt(employee.appointmentsByMonth[8])],
+          ['October', parseInt(employee.appointmentsByMonth[9])],
+          ['November', parseInt(employee.appointmentsByMonth[10])],
+          ['December', parseInt(employee.appointmentsByMonth[11])]
+        ];
+
+        var options = {
+          title: 'Appointments by Month for ' + employee.name,
+          hAxis: {title: '# of Appointments'},
+          vAxis: {title: 'Month', minValue: 0},
+          chartArea: {width: '50%'}
+        };
+
+        var chart = new google.visualization.BarChart(document.getElementById('employee_chart_' + employeeIndex));
+        chart.draw(google.visualization.arrayToDataTable(employeeData), options);
+      }
+
+      // Draw all employee charts
+      function drawAllEmployeeCharts() {
+        employeeStats.forEach(function(_, index) {
+          console.log(`Drawing chart for employee: ${employeeStats[index].name}`);
+          drawEmployeeChart(index);
+        });
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Display total counts -->
+    <div style="display: flex; justify-content: center; align-items: center; font-family: Arial, sans-serif;">
+      <div style="margin-right: 50px; text-align: center;">
+        <h2 style="font-weight: bold;">Completed Appointments (<?= currentMonthName ?>)</h2>
+        <h1><?= monthlyCount ?></h1>
+      </div>
+      <div style="margin-right: 50px; text-align: center;">
+        <h2 style="font-weight: bold;">Completed Appointments (<?= currentQuarter ?>)</h2>
+        <h1><?= quarterlyCount ?></h1>
+      </div>
+      <div style="text-align: center;">
+        <h2 style="font-weight: bold;">Completed Appointments (<?= currentYear ?>)</h2>
+        <h1><?= yearlyCount ?></h1>
+      </div>
+    </div>
+
+    <!-- Div for the total appointments bar chart -->
+    <div id="chart_div" style="width: 900px; height: 500px; margin: 0 auto; text-align: center;"></div>
+
+    <!-- Container for dynamically generated employee sections -->
+    <div id="employee-sections"></div>
+  </body>
+</html>
