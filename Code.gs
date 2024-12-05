@@ -1,16 +1,19 @@
 // Counts the total appointments for the current month
 function getMonthlyAppointments() {
-  return countAppointments(new Date().getFullYear(), new Date().getMonth());
+  var result = countAppointments(new Date().getFullYear(), new Date().getMonth());
+  return { total: result.count, locationCounts: result.locationCounts };
 }
 
 // Counts the total appointments for the current quarter
 function getQuarterlyAppointments() {
-  return countAppointments(new Date().getFullYear(), getQuarterMonths());
+  var result = countAppointments(new Date().getFullYear(), getQuarterMonths());
+  return { total: result.count, locationCounts: result.locationCounts };
 }
 
 // Counts the total appointments for the current year
 function getYearlyAppointments() {
-  return countAppointments(new Date().getFullYear());
+  var result = countAppointments(new Date().getFullYear(), undefined);
+  return { total: result.count, locationCounts: result.locationCounts };
 }
 
 // Counts appointments for a specific month, quarter, or year
@@ -19,14 +22,46 @@ function countAppointments(year, monthOrMonths) {
   var values = sheet.getDataRange().getValues();
   var count = 0;
 
+  // Initialize location counts
+  locationCounts = {
+    Library: 0,
+    SCOW: 0,
+    SeniorCenter: 0,
+    MastersManna: 0,
+    Other: 0
+  };
+  
+  Logger.log("Initialized Location Counts: " + JSON.stringify(locationCounts));
+
   values.slice(1).forEach(row => { // Skip header row
     var appointmentDate = new Date(row[0]);
+    var location = row[4] ? row[4].trim() : "Other"; // Normalize location and default to "Other"
+
     if (isValidDate(appointmentDate) && isWithinPeriod(appointmentDate, year, monthOrMonths)) {
       count++;
+
+      switch (location) {
+        case "Library":
+          locationCounts.Library++;
+          break;
+        case "SCOW":
+          locationCounts.SCOW++;
+          break;
+        case "Senior Center":
+          locationCounts.SeniorCenter++;
+          break;
+        case "Master's Manna":
+          locationCounts.MastersManna++;
+          break;
+        default:
+          locationCounts.Other++;
+          break;
+      }
     }
   });
 
-  return count;
+  Logger.log("Final Location Counts: " + JSON.stringify(locationCounts));
+  return { count, locationCounts };
 }
 
 // Checks if a date falls within the specified year and month(s)
@@ -43,17 +78,32 @@ function isWithinPeriod(date, year, monthOrMonths) {
     : date.getMonth() === monthOrMonths;
 }
 
-// Returns an array of counts of appointments by month for the current year
+// Returns an array of counts of appointments by month for the current year up to the current date
 function getAppointmentsByMonth() {
   var appointmentsByMonth = Array(12).fill(0);
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1").getDataRange().getValues().slice(1).forEach(row => {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1");
+  var values = sheet.getDataRange().getValues().slice(1); // Skip header row
+  var currentDate = new Date();
+  var currentYear = currentDate.getFullYear();
+  var currentMonth = currentDate.getMonth();
+  var currentDay = currentDate.getDate();
+
+  values.forEach(row => {
     var date = new Date(row[0]);
-    if (isValidDate(date) && date.getFullYear() === new Date().getFullYear()) {
-      appointmentsByMonth[date.getMonth()]++;
+    if (isValidDate(date) && date.getFullYear() === currentYear) {
+      // Only count dates up to the current month and current day
+      if (
+        date.getMonth() < currentMonth || 
+        (date.getMonth() === currentMonth && date.getDate() <= currentDay)
+      ) {
+        appointmentsByMonth[date.getMonth()]++;
+      }
     }
   });
+
   return appointmentsByMonth;
 }
+
 
 // Counts monthly, quarterly, or yearly appointments for a specific employee
 function getEmployeeAppointments(employeeName, period) {
@@ -150,16 +200,24 @@ function doGet() {
   // General stats
   var currentYear = new Date().getFullYear();
   var currentQuarter = getQuarterMonths();
-  var monthlyCount = getMonthlyAppointments();
-  var quarterlyCount = getQuarterlyAppointments();
-  var yearlyCount = getYearlyAppointments();
+
+  // Calculate totals and location counts
+  var monthlyData = getMonthlyAppointments();
+  var quarterlyData = getQuarterlyAppointments();
+  var yearlyData = getYearlyAppointments();
+
+  var locationCounts = yearlyData.locationCounts; // Using yearly data for total location count
+
+  // DEBUG
+  Logger.log("Library Appointments: " + locationCounts)
+
   var appointmentsByMonth = getAppointmentsByMonth();
   var averageMonthlyTime = getAverageAppointmentTime(currentYear, new Date().getMonth());
   var averageQuarterlyTime = getAverageAppointmentTime(currentYear, currentQuarter);
   var averageYearlyTime = getAverageAppointmentTime(currentYear);
 
   // Employee stats
-  var employees = ["Connor Bailey", "Elijah Mitchell", "Employee 3"];
+  var employees = ["Connor Bailey", "Elijah Mitchell"];
   
   var employeeStats = employees.map(employeeName => ({
     name: employeeName,
@@ -178,9 +236,11 @@ function doGet() {
 
   // Setup HTML template and pass data
   var template = HtmlService.createTemplateFromFile('index');
-  template.monthlyCount = monthlyCount;
-  template.quarterlyCount = quarterlyCount;
-  template.yearlyCount = yearlyCount;
+  template.monthlyCount = monthlyData.total;
+  template.quarterlyCount = quarterlyData.total;
+  template.yearlyCount = yearlyData.total;
+  template.locationCounts = JSON.stringify(locationCounts);
+
   template.currentQuarter = "Q" + (Math.floor(new Date().getMonth() / 3) + 1);
   template.currentMonthName = getCurrentMonthName();
   template.currentYear = currentYear;
@@ -191,5 +251,5 @@ function doGet() {
   template.averageQuarterlyTime = averageQuarterlyTime;
   template.averageYearlyTime = averageYearlyTime;
 
-  return template.evaluate().setTitle("Tech Connect Metrics (WIP)");
+  return template.evaluate().setTitle("Tech Connect Metrics");
 }
