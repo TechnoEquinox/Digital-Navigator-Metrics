@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    .chart-container {
+      flex: 1;
+      max-width: 450px;  /* wider chart area */
+      min-width: 300px;
+      height: 400px;
+      margin-bottom: 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .pie-table-container {
+      display: flex;
+      justify-content: center;
+      gap: 60px;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+    .pie-chart, .table-container {
+      flex: 1;
+      max-width: 350px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    table {
+      margin: auto;
+      border-collapse: collapse;
+      width: 100%;
+    }
+    th, td {
+      border: 1px solid black;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f4f4f4;
+    }
+    .navigator-section .chart-container {
+      margin: 0 auto; /* horizontally center inside navigator section */
+    }
+
+    .navigator-content {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: nowrap;
+      column-gap: 20px;     /* reduced horizontal spacing */
+      row-gap: 0;
+      max-width: 800px;     /* keep the chart and table clustered */
+      margin: 0 auto;
+    }
+
+    .navigator-table-container {
+      flex-shrink: 0;
+      margin-top: 70px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .navigator-table-container table {
+      border-collapse: collapse;
+      width: 350px;
+      margin: auto;
+    }
+
+    .navigator-table-container th, .navigator-table-container td {
+      border: 1px solid black;
+      padding: 8px;
+      text-align: center;
+    }
+
+    .navigator-table-container th {
+      background-color: #f4f4f4;
+    }
+    .navigator-comments-container {
+      margin: 40px auto 0;
+      max-width: 900px;
+    }
+
+    .navigator-comments-container table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: auto;
+    }
+
+    .navigator-comments-container th,
+    .navigator-comments-container td {
+      border: 1px solid black;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .navigator-comments-container th {
+      background-color: #f4f4f4;
+    }
+
+  </style>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      google.script.run.withSuccessHandler(drawCharts).getFeedbackData();
+      google.script.run.withSuccessHandler(drawNavigatorCharts).getNavigatorData();
+    });
+
+    function drawCharts(data) {
+      drawBarChart(data.ratingCounts, data.averageRating, 'ratingChart');
+      drawPieChart(data.referralCounts);
+      drawReferralTable(data.referralCounts);
+    }
+
+    function drawBarChart(ratingCounts, averageRating, chartId) {
+      const ctx = document.getElementById(chartId).getContext('2d');
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['1', '2', '3', '4', '5'],
+          datasets: [{
+            label: 'Number of Responses',
+            data: [
+              ratingCounts[1] || 0,
+              ratingCounts[2] || 0,
+              ratingCounts[3] || 0,
+              ratingCounts[4] || 0,
+              ratingCounts[5] || 0
+            ],
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.5)',
+              'rgba(54, 162, 235, 0.5)',
+              'rgba(255, 206, 86, 0.5)',
+              'rgba(75, 192, 192, 0.5)',
+              'rgba(153, 102, 255, 0.5)'
+            ],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: `Overall Ratings (Avg: ${averageRating})`,
+              font: { size: 18 }
+            }
+          },
+          scales: { 
+            y: { 
+              beginAtZero: true, 
+              ticks: { stepSize: 1 } 
+            } 
+          }
+        }
+      });
+    }
+
+    function drawPieChart(referralCounts) {
+      const labels = Object.keys(referralCounts);
+      const data = Object.values(referralCounts);
+
+      if (labels.length === 0) {
+        document.getElementById('referralChartContainer').innerHTML = "<p>No referral data available.</p>";
+        return;
+      }
+
+      // Generate different background colors for 
+      // the chart using the golden angle trick
+      const backgroundColors = labels.map((_, i) => `hsl(${(i * 137.5) % 360}, 65%, 65%)`);
+
+      const ctx = document.getElementById('referralChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'pie',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: backgroundColors
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Client Referrals',
+              font: { size: 18 }
+            },
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    function drawReferralTable(referralCounts) {
+      const tableContainer = document.getElementById('referralTableContainer');
+
+      const entries = Object.entries(referralCounts);
+      const total = entries.reduce((sum, [, count]) => sum + count, 0);
+
+      if (total === 0) {
+        tableContainer.innerHTML = "<p>No referral data available.</p>";
+        return;
+      }
+
+      // Sort and slice top 5
+      const sorted = entries.sort((a, b) => b[1] - a[1]);
+      const top5 = sorted.slice(0, 5);
+      const others = sorted.slice(5);
+
+      // Calculate Other count
+      const otherCount = others.reduce((sum, [, count]) => sum + count, 0);
+      const otherPercent = Math.ceil((otherCount / total) * 100);
+
+      // Build table
+      let tableHTML = "<table><tr><th>Referral Source</th><th>Count</th><th>Percent</th></tr>";
+      top5.forEach(([source, count]) => {
+        const percent = Math.floor((count / total) * 100);
+        tableHTML += `<tr><td>${source}</td><td>${count}</td><td>${percent}%</td></tr>`;
+      });
+
+      // Add 'Other' row if applicable
+      if (otherCount > 0) {
+        tableHTML += `<tr><td>Other</td><td>${otherCount}</td><td>${otherPercent}%</td></tr>`;
+      }
+
+      tableHTML += "</table>";
+      tableContainer.innerHTML = tableHTML;
+    }
+    
+    function drawNavigatorCharts(navigatorData) {
+      const container = document.getElementById('navigatorChartsContainer');
+      container.innerHTML = '';
+
+      navigatorData.forEach(navigator => {
+        const section = document.createElement('div');
+        section.className = "navigator-section";
+
+        const chartId = `chart-${navigator.name.replace(/\s+/g, '')}`;
+
+        let commentsHTML = '';
+        if (navigator.comments && navigator.comments.length > 0) {
+          commentsHTML += `<div class="navigator-comments-container"><table>
+            <tr><th>Date</th><th>Comment</th></tr>`;
+          navigator.comments.forEach(comment => {
+            commentsHTML += `<tr><td>${comment.date}</td><td>${comment.text}</td></tr>`;
+          });
+          commentsHTML += `</table></div>`;
+        }
+
+        section.innerHTML = `
+          <hr style="margin: 60px auto; width: 80%; border: 1px solid #ccc;">
+          <h3>${navigator.name}</h3>
+          <div class="navigator-content">
+            <div class="chart-container">
+              <canvas id="${chartId}"></canvas>
+            </div>
+            <div class="navigator-table-container">
+              <table>
+                <tr><th>Metric</th><th>Value</th></tr>
+                <tr><td>Navigator's Technical Knowledge</td><td>${navigator.averageTechKnowledge}</td></tr>
+                <tr><td>Navigator's Communication Skills</td><td>${navigator.averageCommunication}</td></tr>
+                <tr><td>Client Comfort with Technology</td><td>${navigator.averageComfort}</td></tr>
+                <tr><td>Client Recommends Program</td><td>${navigator.recommendationPercent}</td></tr>
+                <tr><td>Total Client Responses</td><td>${navigator.totalResponses}</td></tr>
+              </table>
+            </div>
+          </div>
+          ${commentsHTML}
+        `;
+
+
+        container.appendChild(section);
+        drawBarChart(navigator.ratingCounts, navigator.averageRating, chartId);
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="pie-table-container" style="margin-top: 40px;">
+    <div class="chart-container">
+      <canvas id="ratingChart"></canvas>
+    </div>
+    <div class="pie-chart">
+      <canvas id="referralChart"></canvas>
+    </div>
+    <div class="table-container" id="referralTableContainer"></div>
+  </div>
+  <div id="navigatorChartsContainer" style="margin-top: 50px;"></div>
+</body>
+</html>
