@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      /* Styles for layout */
+      .count-container {
+        display: flex;
+        justify-content: space-around;
+        font-weight: bold;
+        margin-bottom: 20px;
+      }
+      .count-item {
+        margin-right: 10px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th, td {
+        border: 1px solid #ccc;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+
+      /* Conditional formatting styles */
+      .green {
+        color: green;
+        font-weight: bold;
+      }
+      .yellow {
+        color: orange;
+        font-weight: bold;
+      }
+      .red {
+        color: red;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Display counts -->
+    <div class="count-container">
+      <div class="count-item">NEEDS CALL: <span id="needsCallCount"></span></div>
+      <div class="count-item">NEEDS EMAIL: <span id="needsEmailCount"></span></div>
+      <div class="count-item">NEEDS ATTENTION: <span id="needsAttentionCount"></span></div>
+    </div>
+
+    <!-- Display table of NEEDS entries -->
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>Reason</th>
+          <th>Archived</th>
+          <th>Days Since Contact</th>
+        </tr>
+      </thead>
+      <tbody id="needsTableBody"></tbody>
+    </table>
+
+    <script>
+      // Server-passed data
+      const data = JSON.parse('<?= JSON.stringify(metricsData) ?>');  // Safely parses metricsData
+
+      // Function to apply color classes based on count value
+      function getColorClassForCount(count) {
+        if (count <= 5) {
+          return 'green';
+        } else if (count > 5 && count <= 10) {
+          return 'yellow';
+        } else {
+          return 'red';
+        }
+      }
+
+      // Populate counts with conditional formatting
+      const needsCallCount = document.getElementById("needsCallCount");
+      const needsEmailCount = document.getElementById("needsEmailCount");
+      const needsAttentionCount = document.getElementById("needsAttentionCount");
+
+      needsCallCount.innerText = data.needsCounts.call;
+      needsCallCount.classList.add(getColorClassForCount(data.needsCounts.call));
+
+      needsEmailCount.innerText = data.needsCounts.email;
+      needsEmailCount.classList.add(getColorClassForCount(data.needsCounts.email));
+
+      needsAttentionCount.innerText = data.needsCounts.attention;
+      needsAttentionCount.classList.add(getColorClassForCount(data.needsCounts.attention));
+
+      // Populate table with conditional formatting for "Days Since"
+      const tableBody = document.getElementById("needsTableBody");
+      data.needsEntries.forEach(entry => {
+        const row = document.createElement("tr");
+
+        // Determine the class for the "Days Since" cell based on the value
+        let daysClass = '';
+        if (entry.daysSince <= 3) {
+          daysClass = 'green';
+        } else if (entry.daysSince > 3 && entry.daysSince < 7) {
+          daysClass = 'yellow';
+        } else if (entry.daysSince >= 7) {
+          daysClass = 'red';
+        }
+
+        row.innerHTML = `
+          <td>${entry.name}</td>
+          <td>${entry.phone}</td>
+          <td>${entry.reason}</td>
+          <td>${entry.archived}</td>
+          <td class="${daysClass}">${entry.daysSince}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    </script>
+
+    <!-- Display the execution time -->
+    <div style="text-align: center; font-size: 12px; color: #555; margin-top: 20px;">
+      Page generated in <?= executionTime ?> seconds.
+    </div> 
+    
+  </body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawAllCharts);
+
+      // Convert the JSON string from the backend to a JavaScript object
+      var employeeStats = JSON.parse('<?= employeeStats ?>');
+      var currentMonthName = '<?= currentMonthName ?>';
+      var currentQuarter = '<?= currentQuarter ?>';
+      var currentYear = '<?= currentYear ?>';
+
+      // Helper function that averages the appointment pace aross all employees
+      function getAverageAppointmentTimeAcrossEmployees() {
+        var totalMonthly = 0, totalQuarterly = 0, totalYearly = 0;
+        var employeeCount = employeeStats.length;
+        // var employeeCount = 2;
+
+        employeeStats.forEach(employee => {
+          totalMonthly += employee.averageMonthlyTime;
+          totalQuarterly += employee.averageQuarterlyTime;
+          totalYearly += employee.averageYearlyTime;
+        });
+
+        return {monthly: totalMonthly / employeeCount, quarterly: totalQuarterly / employeeCount, yearly: totalYearly / employeeCount};
+      }
+
+      // Average Appointment Pace
+      avgTimes = getAverageAppointmentTimeAcrossEmployees();
+      var averageMonthlyTime = avgTimes.monthly;
+      var averageQuarterlyTime = avgTimes.quarterly;
+      var averageYearlyTime = avgTimes.yearly;
+
+      function drawAllCharts() {
+        drawMainChart();
+        renderAppointmentPaceTable('summary-appointment-pace-table', averageMonthlyTime, averageQuarterlyTime, averageYearlyTime);
+        renderLocationCountsTable('location-counts-table', JSON.parse('<?= locationCounts ?>'));
+        renderEmployeeSections();
+        drawAllEmployeeCharts();
+      }
+
+      // Draw the total chart for all appointments by month
+      function drawMainChart() {
+        var data = google.visualization.arrayToDataTable([
+          ['Month', 'Appointments'],
+          ['January', parseInt(<?= appointmentsByMonth[0] ?>)],
+          ['February', parseInt(<?= appointmentsByMonth[1] ?>)],
+          ['March', parseInt(<?= appointmentsByMonth[2] ?>)],
+          ['April', parseInt(<?= appointmentsByMonth[3] ?>)],
+          ['May', parseInt(<?= appointmentsByMonth[4] ?>)],
+          ['June', parseInt(<?= appointmentsByMonth[5] ?>)],
+          ['July', parseInt(<?= appointmentsByMonth[6] ?>)],
+          ['August', parseInt(<?= appointmentsByMonth[7] ?>)],
+          ['September', parseInt(<?= appointmentsByMonth[8] ?>)],
+          ['October', parseInt(<?= appointmentsByMonth[9] ?>)],
+          ['November', parseInt(<?= appointmentsByMonth[10] ?>)],
+          ['December', parseInt(<?= appointmentsByMonth[11] ?>)]
+        ]);
+
+        var options = {
+          title: 'Appointments by Month in ' + currentYear,
+          hAxis: {title: '# of Appointments'},
+          vAxis: {title: 'Month', minValue: 0},
+          chartArea: {width: '50%'}
+        };
+
+        var chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        chart.draw(data, options);
+      }
+
+      // Render appointment pace table
+      function renderAppointmentPaceTable(containerId, monthlyTime, quarterlyTime, yearlyTime) {
+        var container = document.getElementById(containerId);
+        var tableHtml = `
+          <table style="width: 100%; margin: 0 auto; border-collapse: collapse; border: 1px solid black; text-align: center;">
+            <thead>
+              <tr>
+                <th style="border: 1px solid black; padding: 10px; background-color: #f0f0f0;">Period</th>
+                <th style="border: 1px solid black; padding: 10px; background-color: #f0f0f0;">Appointment Pace (Minutes)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="border: 1px solid black; padding: 10px;">Month</td>
+                <td style="border: 1px solid black; padding: 10px; color: ${getColorForPace(monthlyTime)};">
+                  ${monthlyTime.toFixed(0)}
+                </td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid black; padding: 10px;">Quarter</td>
+                <td style="border: 1px solid black; padding: 10px; color: ${getColorForPace(quarterlyTime)};">
+                  ${quarterlyTime.toFixed(0)}
+                </td>
+              </tr>
+              <tr>
+                <td style="border: 1px solid black; padding: 10px;">Year</td>
+                <td style="border: 1px solid black; padding: 10px; color: ${getColorForPace(yearlyTime)};">
+                  ${yearlyTime.toFixed(0)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+        container.innerHTML = tableHtml;
+      }
+
+      // Render location counts table
+      function renderLocationCountsTable(containerId, locationCounts) {
+        var container = document.getElementById(containerId);
+
+        const locationDisplayNames = {
+          SeniorCenter: "Senior Center",
+          MastersManna: "Master's Manna"
+        };
+
+        var tableHtml = `
+          <table style="width: 100%; margin: 0 auto; border-collapse: collapse; border: 1px solid black; text-align: center;">
+            <thead>
+              <tr>
+                <th style="border: 1px solid black; padding: 10px; background-color: #f0f0f0;">Location</th>
+                <th style="border: 1px solid black; padding: 10px; background-color: #f0f0f0;">Appointments</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${Object.keys(locationCounts)
+                .map(location => `
+                <tr>
+                  <td style="border: 1px solid black; padding: 10px;">
+                    ${locationDisplayNames[location] || location}
+                  </td>
+                  <td style="border: 1px solid black; padding: 10px;">${locationCounts[location]}</td>
+                </tr>
+              `)
+                .join('')}
+            </tbody>
+          </table>
+        `;
+        container.innerHTML = tableHtml;
+      }
+
+      // Get color for appointment pace based on value
+      function getColorForPace(value) {
+        if (value <= 60) return 'green';
+        if (value < 75) return 'orange';
+        return 'red';
+      }
+
+      // Render sections for each employee
+      function renderEmployeeSections() {
+        var container = document.getElementById('employee-sections');
+        container.innerHTML = '';  // Clear any existing content
+
+        employeeStats.forEach(function(employee, index) {
+          var employeeSection = document.createElement('div');
+          employeeSection.innerHTML = `
+            <hr style="width: 80%; margin: 50px auto; border: 1px solid #ccc;">
+            <div style="text-align: center; margin-top: 50px;">
+              <h2 style="font-weight: bold; font-size: 28px;">${employee.name}</h2>
+            </div>
+            <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px;">
+              <div style="margin-right: 50px; text-align: center;">
+                <h2 style="font-weight: bold;">Completed Appointments (${currentMonthName})</h2>
+                <h1>${employee.monthlyCount}</h1>
+              </div>
+              <div style="margin-right: 50px; text-align: center;">
+                <h2 style="font-weight: bold;">Completed Appointments (${currentQuarter})</h2>
+                <h1>${employee.quarterlyCount}</h1>
+              </div>
+              <div style="text-align: center;">
+                <h2 style="font-weight: bold;">Completed Appointments (${currentYear})</h2>
+                <h1>${employee.yearlyCount}</h1>
+              </div>
+            </div>
+            <div id="employee_chart_${index}" style="width: 900px; height: 400px; margin: 20px auto;"></div>
+            <div id="employee-appointment-pace-table-${index}"></div>
+          `;
+          container.appendChild(employeeSection);
+          renderAppointmentPaceTable(`employee-appointment-pace-table-${index}`, employee.averageMonthlyTime, employee.averageQuarterlyTime, employee.averageYearlyTime);
+        });
+      }
+
+      // Draw employee charts
+      function drawAllEmployeeCharts() {
+        employeeStats.forEach(function(_, index) {
+          drawEmployeeChart(index);
+        });
+      }
+
+      function drawEmployeeChart(employeeIndex) {
+        var employee = employeeStats[employeeIndex];
+        if (!employee.appointmentsByMonth) return;
+
+        var employeeData = [
+          ['Month', 'Appointments'],
+          ['January', parseInt(employee.appointmentsByMonth[0])],
+          ['February', parseInt(employee.appointmentsByMonth[1])],
+          ['March', parseInt(employee.appointmentsByMonth[2])],
+          ['April', parseInt(employee.appointmentsByMonth[3])],
+          ['May', parseInt(employee.appointmentsByMonth[4])],
+          ['June', parseInt(employee.appointmentsByMonth[5])],
+          ['July', parseInt(employee.appointmentsByMonth[6])],
+          ['August', parseInt(employee.appointmentsByMonth[7])],
+          ['September', parseInt(employee.appointmentsByMonth[8])],
+          ['October', parseInt(employee.appointmentsByMonth[9])],
+          ['November', parseInt(employee.appointmentsByMonth[10])],
+          ['December', parseInt(employee.appointmentsByMonth[11])]
+        ];
+
+        var chart = new google.visualization.BarChart(document.getElementById('employee_chart_' + employeeIndex));
+        chart.draw(google.visualization.arrayToDataTable(employeeData), {
+          title: 'Appointments by Month for ' + employee.name,
+          hAxis: {title: '# of Appointments'},
+          vAxis: {title: 'Month', minValue: 0},
+          chartArea: {width: '50%'}
+        });
+      }
+    </script>
+    <style>
+      #tables-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      #summary-appointment-pace-table, #location-counts-table {
+        width: 45%;
+      }
+      @media (max-width: 768px) {
+        #summary-appointment-pace-table, #location-counts-table {
+          width: 100%;
+          margin-bottom: 20px;
+        }
+      }
+
+      .chart-row {
+        display:flex;
+        justify-content:center;
+        align-items:flex-start;
+        gap:20px;
+        flex-wrap:nowrap; /* never wrap */
+        overflow-x:auto; /* scroll instead of dropping below */
+      }
+
+      .chart-box {
+        flex:0 0 600px; /* do not shrink, fixed basis */
+        height:500px;
+        box-sizing:border-box;
+        display:flex;
+        align-items:flex-start;
+        justify-content:center;
+      }
+
+      table {
+        margin: 0 auto;
+        max-width: 70%;
+      }
+
+      #employee-sections table {
+        padding-left: 40px;
+        padding-right: 40px;
+      }
+
+
+    </style>
+  </head>
+  <body>
+    <!-- Display total counts -->
+    <div style="display: flex; justify-content: center; align-items: center; font-family: Arial, sans-serif;">
+      <div style="margin-right: 50px; text-align: center;">
+        <h2 style="font-weight: bold;">Completed Appointments (<?= currentMonthName ?>)</h2>
+        <h1><?= monthlyCount ?></h1>
+      </div>
+      <div style="margin-right: 50px; text-align: center;">
+        <h2 style="font-weight: bold;">Completed Appointments (<?= currentQuarter ?>)</h2>
+        <h1><?= quarterlyCount ?></h1>
+      </div>
+      <div style="text-align: center;">
+        <h2 style="font-weight: bold;">Completed Appointments (<?= currentYear ?>)</h2>
+        <h1><?= yearlyCount ?></h1>
+      </div>
+    </div>
+
+    <!-- Flex container for bar chart and embedded Google Sheets chart -->
+    <div class="chart-row" style="margin-top:40px;">
+      <!-- Main Google Chart bar chart -->
+      <div class="chart-box">
+        <div id="chart_div" style="width:100%; height:100%;"></div>
+      </div>
+
+      <!-- Embedded chart from Google Sheets -->
+      <div class="chart-box">
+        <iframe
+          src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQbaQW7bN17GKSEk4It1D1pDLcnrBPfHNyx0KOpRS0rT6dw0HSMytBC_nWI60sumP8MBoX1lblhnpkU/pubchart?oid=112095027&format=interactive"
+          width="100%" height="100%" frameborder="0"
+          style="border:none; margin:0; padding:0; display:block;"
+          allowfullscreen>
+        </iframe>
+      </div>
+    </div>
+
+
+    <!-- Flex container for the two tables -->
+    <div id="tables-container">
+      <div id="summary-appointment-pace-table"></div>
+      <div id="location-counts-table"></div>
+    </div>
+
+    <!-- Employee sections -->
+    <div id="employee-sections"></div>
+
+    <!-- Execution time -->
+    <div style="text-align: center; font-size: 12px; color: #555; margin-top: 20px;">
+      Page generated in <?= executionTime ?> seconds.
+    </div>
+  </body>
+</html>
+
